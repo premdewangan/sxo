@@ -1,0 +1,49 @@
+parameters:
+- name: envname
+  type: string
+  default: 'INT'
+- name: testPlan
+  type: string
+  default: 'E2EBPT-1610'
+- name: uploadResultstoTracksapce
+  type: string
+  default: 'Y'
+- name: browser
+  type: string
+  default: chromium
+
+pool:
+  name: 'VMSS-BuildAgentWindows-Testing-LHG-DDL'
+  
+trigger:
+- main
+
+jobs:
+- job: MyJob
+  timeoutInMinutes: 45  # Set timeout to 45 minutes
+
+  steps:
+
+  - script: |
+      echo Add other tasks to build, test, and deploy your project.
+  - script: mvn -X clean install exec:java -D"exec.mainClass"="com.e2e.xray.ExportTests" -D"exec.classpathScope"="test" -e -DskipTests -D"xray_test_plan_id"=${{parameters.testPlan}}
+    displayName: 'Export Tests from Trackspace'
+    
+  - script: mvn -X clean install exec:java -D"exec.mainClass"="com.e2e.dockspace.FetchDynamicTestData" -D"exec.classpathScope"="test" -e -DskipTests
+    displayName: 'Export Test Data' 
+
+  #- script: mvn test -Dtest=JunitRunner
+  - script: mvn test -Dtest=TestRunner -DenvName=${{parameters.envname}} -Dcucumber.options="--tags @${{parameters.testPlan}}" -DenableXray=${{parameters.uploadResultstoTracksapce}} -Dheadless="true" -D"xray_test_plan_id"=${{parameters.testPlan}} -D"browser"=${{parameters.browser}}
+    displayName: 'Test Execution'
+    
+  - script: 'mvn dependency:resolve'
+    condition: succeededOrFailed()
+    displayName: 'Resolve Dependencies'
+    workingDirectory: $(Build.SourcesDirectory)
+    
+  #- task: PublishBuildArtifacts@1
+  #  condition: always()
+  #  inputs:
+  #    PathtoPublish: "$(Build.SourcesDirectory)/Reports"
+  #    artifactName: "Reports"
+  #    # publishLocation: "Container"   
